@@ -9,102 +9,85 @@
 import SpriteKit
 import GameplayKit
 
-class GameScene: SKScene {
+class GameScene: SKScene, SKPhysicsContactDelegate {
     
-    var entities = [GKEntity]()
-    var graphs = [String : GKGraph]()
     
-    private var lastUpdateTime : TimeInterval = 0
-    private var label : SKLabelNode?
-    private var spinnyNode : SKShapeNode?
+    var player = SKSpriteNode()
+    var cactus = SKSpriteNode()
+    var currentScore = SKLabelNode()
+    var score = 0
+    var scored = false
+    var hit = false;
+    
+    
+    var playerStartPosition = CGFloat()
+    var cactiStartPosition = CGFloat()
     
     override func sceneDidLoad() {
-
-        self.lastUpdateTime = 0
         
-        // Get label node from scene and store it for use later
-        self.label = self.childNode(withName: "//helloLabel") as? SKLabelNode
-        if let label = self.label {
-            label.alpha = 0.0
-            label.run(SKAction.fadeIn(withDuration: 2.0))
-        }
+        physicsWorld.contactDelegate = self
         
-        // Create shape node to use during mouse interaction
-        let w = (self.size.width + self.size.height) * 0.05
-        self.spinnyNode = SKShapeNode.init(rectOf: CGSize.init(width: w, height: w), cornerRadius: w * 0.3)
+        player = self.childNode(withName: "player") as! SKSpriteNode
+        cactus = self.childNode(withName: "cacti") as! SKSpriteNode
+        currentScore = self.childNode(withName: "ScoreCounter") as! SKLabelNode
         
-        if let spinnyNode = self.spinnyNode {
-            spinnyNode.lineWidth = 2.5
-            
-            spinnyNode.run(SKAction.repeatForever(SKAction.rotate(byAngle: CGFloat(Double.pi), duration: 1)))
-            spinnyNode.run(SKAction.sequence([SKAction.wait(forDuration: 0.5),
-                                              SKAction.fadeOut(withDuration: 0.5),
-                                              SKAction.removeFromParent()]))
-        }
+        //player.physicsBody = SKPhysicsBody(rectangleOf: player.size)
+        player.physicsBody?.contactTestBitMask = player.physicsBody!.collisionBitMask
+        //cactus.physicsBody = SKPhysicsBody(rectangleOf: cactus.size)
+        //cactus.physicsBody?.contactTestBitMask = player.physicsBody!.collisionBitMask
+        
+        player.constraints = [SKConstraint.positionX(SKRange(constantValue: -240))]
+    
+        cactus.constraints = [SKConstraint.positionY(SKRange(constantValue: cactus.position.y))]
+        
+        playerStartPosition = player.position.y
+        cactiStartPosition = cactus.position.y
     }
     
-    
-    func touchDown(atPoint pos : CGPoint) {
-        if let n = self.spinnyNode?.copy() as! SKShapeNode? {
-            n.position = pos
-            n.strokeColor = SKColor.green
-            self.addChild(n)
-        }
-    }
-    
-    func touchMoved(toPoint pos : CGPoint) {
-        if let n = self.spinnyNode?.copy() as! SKShapeNode? {
-            n.position = pos
-            n.strokeColor = SKColor.blue
-            self.addChild(n)
-        }
-    }
-    
-    func touchUp(atPoint pos : CGPoint) {
-        if let n = self.spinnyNode?.copy() as! SKShapeNode? {
-            n.position = pos
-            n.strokeColor = SKColor.red
-            self.addChild(n)
-        }
-    }
-    
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if let label = self.label {
-            label.run(SKAction.init(named: "Pulse")!, withKey: "fadeInOut")
+    override func touchesBegan(_ touches: Set<UITouch>,
+                      with event: UIEvent?) {
+        if(!(player.position.y > playerStartPosition)) {
+            player.physicsBody?.applyImpulse(CGVector(dx: 0, dy: 600))
         }
         
-        for t in touches { self.touchDown(atPoint: t.location(in: self)) }
-    }
-    
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for t in touches { self.touchMoved(toPoint: t.location(in: self)) }
-    }
-    
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for t in touches { self.touchUp(atPoint: t.location(in: self)) }
-    }
-    
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for t in touches { self.touchUp(atPoint: t.location(in: self)) }
     }
     
     
     override func update(_ currentTime: TimeInterval) {
-        // Called before each frame is rendered
-        
-        // Initialize _lastUpdateTime if it has not already been
-        if (self.lastUpdateTime == 0) {
-            self.lastUpdateTime = currentTime
+        if ( hit == true) {
+            cactus.position.x = CGFloat(450)
+            cactus.position.y = cactiStartPosition
+            hit = false
+            player.colorBlendFactor = 0.0
+        }
+        if(cactus.position.x < player.position.x && scored == false) {
+            score += 1
+            currentScore.text = "Score: \(score)"
+            scored = true
+        }
+        if(cactus.position.x < CGFloat(-375)) {
+            cactus.position.x = CGFloat(450)
+            //cactus.position.y = cactiStartPosition
+            scored = false
+            player.colorBlendFactor = 0.0
+        } else {
+            cactus.physicsBody?.velocity = CGVector(dx: -250, dy: 0)
+        }
+    }
+    
+    func didBegin(_ contact: SKPhysicsContact) {
+        if contact.bodyA == cactus.physicsBody {
+            // Reset game
+            print("collision")
+            cactus.physicsBody?.velocity = CGVector(dx: 0, dy: 0)
+            player.color = .red
+            player.colorBlendFactor = 0.5
+            score = 0
+            currentScore.text = "Score: \(score)"
+            hit = true;
         }
         
-        // Calculate time since last update
-        let dt = currentTime - self.lastUpdateTime
         
-        // Update entities
-        for entity in self.entities {
-            entity.update(deltaTime: dt)
-        }
-        
-        self.lastUpdateTime = currentTime
+    
     }
 }
